@@ -1,6 +1,12 @@
 [package]
 name = "coolr"
+description = "Compiler for the Cool classroom language."
+license = "AGPL-3.0-only"
 version = "0.1.0"
+
+repository = "https://github.com/AndreiDuma/Coolr"
+keywords = ["compilers"]
+
 edition = "2021"
 
 [dependencies]

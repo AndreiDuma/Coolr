@@ -1,6 +1,6 @@
-# Coolr -- A Cool Compiler Written in Rust -- WIP!
-
 ![](https://github.com/AndreiDuma/Coolr/actions/workflows/rust.yml/badge.svg?event=push)
+
+# Coolr – A Cool Compiler Written in Rust – WIP
 
 ## Useful references
 
