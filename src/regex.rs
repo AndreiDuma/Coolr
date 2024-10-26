@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, ops::Range};
 
-use crate::nfa::ThompsonNFA;
+use crate::nfa::NFA;
 
 #[derive(Clone, PartialEq, Eq)]
 struct Alphabet {
@@ -23,7 +23,7 @@ struct Regex {
     ast: Ast,
 }
 
-fn thompsons_construction(regex: Regex) -> ThompsonNFA {
+fn thompsons_construction(regex: Regex) -> NFA {
     match regex.ast {
         Ast::Empty => todo!(),
         Ast::Literal(_) => todo!(),
