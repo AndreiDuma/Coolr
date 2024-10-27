@@ -1,48 +1,30 @@
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct State(usize);
 
-impl State {
-    fn shifted(&self, amount: usize) -> Self {
-        State(self.0 + amount)
-    }
-}
-
-enum Transitions {
+#[derive(Clone, Copy)]
+enum StateTransitions {
     None,
     OneCharacter(char, State),
     OneEpsilon(State),
     TwoEpsilon(State, State),
 }
 
-impl Transitions {
-    fn shifted(&self, amount: usize) -> Self {
-        match self {
-            Transitions::None => Transitions::None,
-            Transitions::OneCharacter(c, s) => Transitions::OneCharacter(*c, s.shifted(amount)),
-            Transitions::OneEpsilon(s) => Transitions::OneEpsilon(s.shifted(amount)),
-            Transitions::TwoEpsilon(s, t) => {
-                Transitions::TwoEpsilon(s.shifted(amount), t.shifted(amount))
-            }
-        }
-    }
-}
-
+#[derive(Clone)]
 pub struct NFA {
-    transitions: Vec<Transitions>,
     initial_state: State,
     accepting_state: State,
+    transitions: Vec<StateTransitions>,
 }
-
-// fn subset_construction(nfa: &NFA) -> DFA {
-//     todo!()
-// }
 
 impl NFA {
     pub fn empty() -> Self {
         Self {
             initial_state: State(0),
             accepting_state: State(1),
-            transitions: vec![Transitions::OneEpsilon(State(1)), Transitions::None],
+            transitions: vec![
+                StateTransitions::OneEpsilon(State(1)),
+                StateTransitions::None,
+            ],
         }
     }
 
@@ -50,73 +32,131 @@ impl NFA {
         Self {
             initial_state: State(0),
             accepting_state: State(1),
-            transitions: vec![Transitions::OneCharacter(c, State(1)), Transitions::None],
+            transitions: vec![
+                StateTransitions::OneCharacter(c, State(1)),
+                StateTransitions::None,
+            ],
         }
     }
 
-    pub fn concatenation(self, other: Self) -> Self {
-        let other = other.shifted(self.size() - 1);
-        Self {
-            accepting_state: other.accepting_state,
-            transitions: {
-                let mut transitions = self.transitions;
-                transitions.pop();
-                transitions.extend(other.transitions);
-                transitions
-            },
-            ..self
-        }
-    }
+    pub fn concatenation(first: NFA, second: Self) -> Self {
+        let initial_state = State(0);
+        let accepting_state = State(first.size() + second.size() - 2);
 
-    pub fn union(self, other: Self) -> Self {
-        let this = self.shifted(1);
-        let other = other.shifted(this.size() + 1);
+        // The accepting state of the first NFA and the initial state
+        // of the second NFA need to be merged. Therefore we drop the
+        // last state of the first NFA before appending the states of
+        // the second one.
+        let mut transitions = first.transitions;
+        transitions.pop();
+        transitions.extend(shift_transitions(second.transitions, transitions.len()));
 
         Self {
-            initial_state: State(0),
-            accepting_state: State(this.size() + other.size() + 1),
-            transitions: {
-                let mut transitions = vec![Transitions::TwoEpsilon(
-                    this.initial_state,
-                    other.initial_state,
-                )];
-                transitions.extend(this.transitions);
-                transitions.extend(other.transitions);
-                transitions.push(Transitions::None);
-                transitions
-            },
-        }
-    }
-
-    pub fn kleene_star(self) -> Self {
-        let this = self.shifted(1);
-        let accepting_state = State(this.size() + 1);
-        Self {
-            initial_state: State(0),
+            initial_state,
             accepting_state,
-            transitions: {
-                let mut transitions =
-                    vec![Transitions::TwoEpsilon(this.initial_state, accepting_state)];
-                transitions.extend(this.transitions);
-                transitions.push(Transitions::None);
-                transitions
-            },
+            transitions,
         }
     }
 
-    fn size(&self) -> usize {
+    pub fn union(first: NFA, second: Self) -> Self {
+        let first_size = first.size();
+
+        let initial_state = State(0);
+        let accepting_state = State(first_size + second.size() + 1);
+
+        // Create new initial state.
+        let mut transitions = vec![StateTransitions::TwoEpsilon(
+            State(1),
+            State(1 + first_size),
+        )];
+
+        // Embed first NFA and patch its accepting state.
+        transitions.extend({
+            let shifted = shift_transitions(first.transitions, 1);
+            patch_accepting_state(shifted, StateTransitions::OneEpsilon(accepting_state))
+        });
+
+        // Embed second NFA and patch its accepting state.
+        transitions.extend({
+            let shifted = shift_transitions(second.transitions, 1 + first_size);
+            patch_accepting_state(shifted, StateTransitions::OneEpsilon(accepting_state))
+        });
+
+        // Create new accepting state.
+        transitions.push(StateTransitions::None);
+
+        Self {
+            initial_state,
+            accepting_state,
+            transitions,
+        }
+    }
+
+    pub fn kleene_star(nfa: NFA) -> Self {
+        let initial_state = State(0);
+        let accepting_state = State(nfa.size() + 1);
+
+        // Create new initial state.
+        let mut transitions = vec![StateTransitions::TwoEpsilon(State(1), accepting_state)];
+
+        // Embed given NFA and patch its accepting state.
+        transitions.extend({
+            let shifted = shift_transitions(nfa.transitions, 1);
+            patch_accepting_state(
+                shifted,
+                StateTransitions::TwoEpsilon(State(1), accepting_state),
+            )
+        });
+
+        // Create new accepting state.
+        transitions.push(StateTransitions::None);
+
+        Self {
+            initial_state,
+            accepting_state,
+            transitions,
+        }
+    }
+
+    pub fn initial_state(&self) -> usize {
+        0
+    }
+
+    pub fn accepting_state(&self) -> usize {
+        self.transitions.len() - 1
+    }
+
+    pub fn size(&self) -> usize {
         self.transitions.len()
     }
+}
 
-    fn shifted(self, amount: usize) -> Self {
-        Self {
-            initial_state: self.initial_state.shifted(amount),
-            accepting_state: self.accepting_state.shifted(amount),
-            transitions: self
-                .transitions
-                .into_iter()
-                .map(|t| t.shifted(amount))
-                .collect(),
+fn shift_transitions(
+    mut transitions: Vec<StateTransitions>,
+    amount: usize,
+) -> Vec<StateTransitions> {
+    let shift_state = |s: State| State(s.0 + amount);
+    let shift_transitions = |t| match t {
+        StateTransitions::None => StateTransitions::None,
+        StateTransitions::OneCharacter(c, s) => StateTransitions::OneCharacter(c, shift_state(s)),
+        StateTransitions::OneEpsilon(s) => StateTransitions::OneEpsilon(shift_state(s)),
+        StateTransitions::TwoEpsilon(s, t) => {
+            StateTransitions::TwoEpsilon(shift_state(s), shift_state(t))
         }
-    }
+    };
+
+    transitions
+        .iter_mut()
+        .for_each(|t| *t = shift_transitions(*t));
+    transitions
+}
+
+fn patch_accepting_state(
+    mut transitions: Vec<StateTransitions>,
+    new: StateTransitions,
+) -> Vec<StateTransitions> {
+    *transitions
+        .last_mut()
+        .expect("should have at least two states") = new;
+    transitions
 }

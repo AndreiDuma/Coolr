@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, ops::Range};
 
-use crate::nfa::NFA;
+use crate::thompson::NFA;
 
 #[derive(Clone, PartialEq, Eq)]
 struct Alphabet {
@@ -25,15 +25,11 @@ struct Regex {
 
 fn thompsons_construction(regex: Regex) -> NFA {
     match regex.ast {
-        Ast::Empty => todo!(),
-        Ast::Literal(_) => todo!(),
+        Ast::Empty => NFA::empty(),
+        Ast::Literal(c) => NFA::character(c),
         // Ast::Bracket(_) => todo!(),
         Ast::Concatenation(_) => todo!(),
         Ast::Alternation(_) => todo!(),
         Ast::Repetition(_) => todo!(),
     }
-}
-
-fn f() {
-    let re = Ast::Concatenation(vec![Ast::Literal('i'), Ast::Literal('f')]);
 }
