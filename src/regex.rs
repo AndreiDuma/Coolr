@@ -1,35 +1,41 @@
-use std::{collections::BTreeSet, ops::Range};
-
 use crate::thompson::NFA;
 
-#[derive(Clone, PartialEq, Eq)]
-struct Alphabet {
-    characters: BTreeSet<char>,
-    ranges: BTreeSet<Range<char>>, // TODO: should this be a Vec?
-}
+// #[derive(Clone, PartialEq, Eq)]
+// struct Alphabet {
+//     characters: BTreeSet<char>,
+//     ranges: BTreeSet<Range<char>>, // TODO: should this be a Vec?
+// }
 
-#[derive(Clone, PartialEq, Eq)]
-enum Ast {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Expr {
     Empty,
-    Literal(char),
+    Character(char),
     // Bracket(Vec<Range<char>>),
-    Concatenation(Vec<Ast>),
-    Alternation(Vec<Ast>),
-    Repetition(Box<Ast>),
+    Concatenation(Vec<Expr>),
+    Alternation(Vec<Expr>),
+    Repetition(Box<Expr>),
 }
 
-struct Regex {
-    pattern: String,
-    ast: Ast,
-}
+// struct Regex {
+//     pattern: String,
+//     ast: Expr,
+// }
 
-fn thompsons_construction(regex: Regex) -> NFA {
-    match regex.ast {
-        Ast::Empty => NFA::empty(),
-        Ast::Literal(c) => NFA::character(c),
+pub fn thompsons_construction(expr: Expr) -> NFA {
+    match expr {
+        Expr::Empty => NFA::empty(),
+        Expr::Character(c) => NFA::character(c),
         // Ast::Bracket(_) => todo!(),
-        Ast::Concatenation(_) => todo!(),
-        Ast::Alternation(_) => todo!(),
-        Ast::Repetition(_) => todo!(),
+        Expr::Concatenation(exprs) => exprs
+            .into_iter()
+            .map(thompsons_construction)
+            .reduce(NFA::concatenation)
+            .expect("a concatenation expression must not be empty"),
+        Expr::Alternation(exprs) => exprs
+            .into_iter()
+            .map(thompsons_construction)
+            .reduce(NFA::union)
+            .expect("an alternation expression must not be empty"),
+        Expr::Repetition(expr) => NFA::kleene_star(thompsons_construction(*expr)),
     }
 }

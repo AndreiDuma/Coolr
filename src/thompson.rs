@@ -1,7 +1,7 @@
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Debug)]
 struct State(usize);
 
-#[derive(Clone, Copy)]
+#[derive(Copy, Clone, Debug)]
 enum StateTransitions {
     None,
     OneCharacter(char, State),
@@ -9,7 +9,7 @@ enum StateTransitions {
     TwoEpsilon(State, State),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct NFA {
     initial_state: State,
     accepting_state: State,
