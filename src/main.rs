@@ -14,8 +14,11 @@ fn main() {
     ])));
     dbg!(&expr);
 
-    let nfa = regex::thompsons_construction(expr);
+    let nfa = nfa::build(expr);
     dbg!(&nfa);
+
+    let dfa = dfa::build(&nfa);
+    dbg!(&dfa);
 
     let re = "(ab|c)*";
     regex::tokenize(re.chars()).for_each(|t| println!("{t:?}"));
