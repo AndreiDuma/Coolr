@@ -1,5 +1,5 @@
-use crate::nfa::StateID;
-use crate::nfa::StateSet;
+use crate::util::StateID;
+use crate::util::StateSet;
 
 use std::collections::{BTreeSet, VecDeque};
 

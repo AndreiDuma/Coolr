@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::nfa::StateID;
+use crate::util::StateID;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct StateSet(BTreeSet<StateID>);

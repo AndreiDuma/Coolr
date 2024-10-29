@@ -1,7 +1,8 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
 
 use crate::dfa::DFA;
-use crate::nfa::{StateSet, NFA};
+use crate::nfa::NFA;
+use crate::util::StateSet;
 
 pub fn build(nfa: &NFA) -> DFA {
     let initial_config = nfa.follow_epsilon(&StateSet::with_state(nfa.initial_state()));
