@@ -1,5 +1,5 @@
-mod expr;
+mod ast;
 mod syntax;
 
-pub use expr::*;
+pub use ast::*;
 pub use syntax::*;

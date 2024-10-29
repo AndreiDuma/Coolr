@@ -1,20 +1,20 @@
 use crate::nfa::NFA;
-use crate::regex::Expr;
+use crate::regex;
 
-pub fn build(expr: Expr) -> NFA {
+pub fn build(expr: regex::Ast) -> NFA {
     match expr {
-        Expr::Empty => NFA::empty(),
-        Expr::Character(c) => NFA::character(c),
-        Expr::Concatenation(exprs) => exprs
+        regex::Ast::Empty => NFA::empty(),
+        regex::Ast::Character(c) => NFA::character(c),
+        regex::Ast::Concatenation(exprs) => exprs
             .into_iter()
             .map(build)
             .reduce(NFA::concatenation)
             .expect("a concatenation expression must not be empty"),
-        Expr::Alternation(exprs) => exprs
+        regex::Ast::Alternation(exprs) => exprs
             .into_iter()
             .map(build)
             .reduce(NFA::union)
             .expect("an alternation expression must not be empty"),
-        Expr::Repetition(expr) => NFA::kleene_star(build(*expr)),
+        regex::Ast::Repetition(expr) => NFA::kleene_star(build(*expr)),
     }
 }

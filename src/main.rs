@@ -5,12 +5,9 @@ mod regex;
 fn main() {
     println!("One day I will be a Cool compiler!");
 
-    let expr = regex::Expr::Repetition(Box::new(regex::Expr::Alternation(vec![
-        regex::Expr::Concatenation(vec![
-            regex::Expr::Character('a'),
-            regex::Expr::Character('b'),
-        ]),
-        regex::Expr::Character('c'),
+    let expr = regex::Ast::Repetition(Box::new(regex::Ast::Alternation(vec![
+        regex::Ast::Concatenation(vec![regex::Ast::Character('a'), regex::Ast::Character('b')]),
+        regex::Ast::Character('c'),
     ])));
     dbg!(&expr);
 
