@@ -5,7 +5,6 @@ pub fn build(expr: Expr) -> NFA {
     match expr {
         Expr::Empty => NFA::empty(),
         Expr::Character(c) => NFA::character(c),
-        // Ast::Bracket(_) => todo!(),
         Expr::Concatenation(exprs) => exprs
             .into_iter()
             .map(build)

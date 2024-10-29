@@ -1,10 +1,10 @@
 use std::collections::{BTreeSet, HashMap, VecDeque};
 
 use crate::dfa::DFA;
-use crate::nfa::{Configuration, NFA};
+use crate::nfa::{StateSet, NFA};
 
 pub fn build(nfa: &NFA) -> DFA {
-    let initial_config = nfa.follow_epsilon(&Configuration::with_state(nfa.initial_state()));
+    let initial_config = nfa.follow_epsilon(&StateSet::with_state(nfa.initial_state()));
 
     let mut configs = BTreeSet::new();
     configs.insert(initial_config.clone()); // TODO: can we not clone here?
@@ -12,7 +12,7 @@ pub fn build(nfa: &NFA) -> DFA {
     let mut queue = VecDeque::new();
     queue.push_back(initial_config);
 
-    let mut transitions: HashMap<(Configuration, char), Configuration> = HashMap::new();
+    let mut transitions: HashMap<(StateSet, char), StateSet> = HashMap::new();
 
     while let Some(config) = queue.pop_front() {
         for chr in nfa.alphabet() {

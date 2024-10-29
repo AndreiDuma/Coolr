@@ -1,38 +1,7 @@
+use crate::nfa::StateID;
+use crate::nfa::StateSet;
+
 use std::collections::{BTreeSet, VecDeque};
-
-/// TODO: move this to a shared module since it's also used in the
-/// DFA.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct StateID(usize);
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Configuration {
-    states: BTreeSet<StateID>,
-}
-
-impl Configuration {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_state(state: StateID) -> Self {
-        let mut config = Self::new();
-        config.states.insert(state);
-        config
-    }
-
-    pub fn with_states(states: BTreeSet<StateID>) -> Configuration {
-        Configuration { states }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = StateID> + '_ {
-        self.states.iter().copied()
-    }
-}
 
 #[derive(Copy, Clone, Debug)]
 enum StateTransitions {
@@ -201,15 +170,7 @@ impl NFA {
         }
     }
 
-    // pub fn on_character(&self, state: State) -> Option<(char, State)> {
-    //     match self.transitions[state.0] {
-    //         StateTransitions::OneCharacter(c, s) => Some((c, s)),
-    //         _ => None,
-    //     }
-    // }
-
-    /// TODO: convert to Configuration -> Configuration
-    pub fn follow_epsilon(&self, config: &Configuration) -> Configuration {
+    pub fn follow_epsilon(&self, config: &StateSet) -> StateSet {
         let mut states = BTreeSet::new();
 
         let mut queue = VecDeque::new();
@@ -227,10 +188,10 @@ impl NFA {
                 queue.push_back(next);
             }
         }
-        Configuration { states }
+        StateSet::with_states(states)
     }
 
-    pub fn follow_character(&self, config: &Configuration, chr: char) -> Configuration {
+    pub fn follow_character(&self, config: &StateSet, chr: char) -> StateSet {
         let mut states = BTreeSet::new();
 
         for s in config.iter() {
@@ -238,7 +199,7 @@ impl NFA {
                 states.insert(state);
             }
         }
-        Configuration::with_states(states)
+        StateSet::with_states(states)
     }
 }
 
