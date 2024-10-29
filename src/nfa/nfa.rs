@@ -1,178 +1,73 @@
-use crate::util::StateID;
-use crate::util::StateSet;
+use crate::nfa::Builder;
+use crate::regex;
+use crate::util::{StateID, StateSet};
 
 use std::collections::{BTreeSet, VecDeque};
 
-#[derive(Copy, Clone, Debug)]
-enum StateTransitions {
-    None,
-    OneCharacter(char, StateID),
-    OneEpsilon(StateID),
-    TwoEpsilon(StateID, StateID),
+#[derive(Clone, Debug)]
+pub(super) enum State {
+    Empty(StateID),
+    Alternation(Vec<StateID>),
+    Character(StateID, char),
+    Match,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NFA {
+    states: Vec<State>,
+    start_state: StateID,
     alphabet: BTreeSet<char>,
-    initial_state: StateID,
-    accepting_state: StateID,
-    transitions: Vec<StateTransitions>,
 }
 
 impl NFA {
-    pub fn empty() -> Self {
+    pub fn new(ast: &regex::Ast) -> Self {
+        let mut builder = Builder::new();
+        builder.add_ast(ast);
+        builder.build()
+    }
+
+    pub(super) fn from_parts(
+        states: Vec<State>,
+        start_state: StateID,
+        alphabet: BTreeSet<char>,
+    ) -> Self {
         Self {
-            alphabet: BTreeSet::new(),
-            initial_state: StateID::new(0),
-            accepting_state: StateID::new(1),
-            transitions: vec![
-                StateTransitions::OneEpsilon(StateID::new(1)),
-                StateTransitions::None,
-            ],
+            states,
+            start_state,
+            alphabet,
         }
     }
 
-    pub fn character(c: char) -> Self {
-        Self {
-            alphabet: {
-                let mut alphabet = BTreeSet::new();
-                alphabet.insert(c);
-                alphabet
-            },
-            initial_state: StateID::new(0),
-            accepting_state: StateID::new(1),
-            transitions: vec![
-                StateTransitions::OneCharacter(c, StateID::new(1)),
-                StateTransitions::None,
-            ],
-        }
-    }
-
-    pub fn concatenation(first: NFA, second: Self) -> Self {
-        let initial_state = StateID::new(0);
-        let accepting_state = StateID::new(first.size() + second.size() - 2);
-
-        // The accepting state of the first NFA and the initial state
-        // of the second NFA need to be merged. Therefore we drop the
-        // last state of the first NFA before appending the states of
-        // the second one.
-        let mut transitions = first.transitions;
-        transitions.pop();
-        transitions.extend(shift_transitions(second.transitions, transitions.len()));
-
-        Self {
-            alphabet: alphabet_union(first.alphabet, second.alphabet),
-            initial_state,
-            accepting_state,
-            transitions,
-        }
-    }
-
-    pub fn union(first: NFA, second: Self) -> Self {
-        let first_size = first.size();
-
-        let initial_state = StateID::new(0);
-        let accepting_state = StateID::new(first_size + second.size() + 1);
-
-        // Create new initial state.
-        let mut transitions = vec![StateTransitions::TwoEpsilon(
-            StateID::new(1),
-            StateID::new(1 + first_size),
-        )];
-
-        // Embed first NFA and patch its accepting state.
-        transitions.extend({
-            let shifted = shift_transitions(first.transitions, 1);
-            patch_accepting_state(shifted, StateTransitions::OneEpsilon(accepting_state))
-        });
-
-        // Embed second NFA and patch its accepting state.
-        transitions.extend({
-            let shifted = shift_transitions(second.transitions, 1 + first_size);
-            patch_accepting_state(shifted, StateTransitions::OneEpsilon(accepting_state))
-        });
-
-        // Create new accepting state.
-        transitions.push(StateTransitions::None);
-
-        Self {
-            alphabet: alphabet_union(first.alphabet, second.alphabet),
-            initial_state,
-            accepting_state,
-            transitions,
-        }
-    }
-
-    pub fn kleene_star(nfa: NFA) -> Self {
-        let initial_state = StateID::new(0);
-        let accepting_state = StateID::new(nfa.size() + 1);
-
-        // Create new initial state.
-        let mut transitions = vec![StateTransitions::TwoEpsilon(
-            StateID::new(1),
-            accepting_state,
-        )];
-
-        // Embed given NFA and patch its accepting state.
-        transitions.extend({
-            let shifted = shift_transitions(nfa.transitions, 1);
-            patch_accepting_state(
-                shifted,
-                StateTransitions::TwoEpsilon(StateID::new(1), accepting_state),
-            )
-        });
-
-        // Create new accepting state.
-        transitions.push(StateTransitions::None);
-
-        Self {
-            alphabet: nfa.alphabet,
-            initial_state,
-            accepting_state,
-            transitions,
-        }
-    }
+    //// TODO: rethink everything below.
 
     pub fn alphabet(&self) -> impl Iterator<Item = char> + '_ {
         self.alphabet.iter().copied()
     }
 
-    pub fn initial_state(&self) -> StateID {
-        StateID::new(0)
-    }
-
-    pub fn accepting_state(&self) -> StateID {
-        StateID::new(self.transitions.len() - 1)
-    }
-
-    pub fn is_accepting_state(&self, state: StateID) -> bool {
-        state == self.accepting_state()
-    }
-
-    pub fn size(&self) -> usize {
-        self.transitions.len()
+    pub fn start_state(&self) -> StateID {
+        self.start_state
     }
 
     pub fn on_epsilon(&self, state: StateID) -> Vec<StateID> {
-        match self.transitions[state] {
-            StateTransitions::OneEpsilon(s) => vec![s],
-            StateTransitions::TwoEpsilon(s, t) => vec![s, t],
+        match self.states[state] {
+            State::Empty(s) => vec![s],
+            State::Alternation(ref alts) => alts.clone(),
             _ => vec![],
         }
     }
 
     pub fn on_character(&self, state: StateID, chr: char) -> Option<StateID> {
-        match self.transitions[state] {
-            StateTransitions::OneCharacter(c, s) if c == chr => Some(s),
+        match self.states[state] {
+            State::Character(s, c) if c == chr => Some(s),
             _ => None,
         }
     }
 
-    pub fn follow_epsilon(&self, config: &StateSet) -> StateSet {
+    pub fn follow_epsilon(&self, set: &StateSet) -> StateSet {
         let mut states = StateSet::new();
 
         let mut queue = VecDeque::new();
-        for state in config.iter() {
+        for state in set.iter() {
             queue.push_back(state)
         }
 
@@ -199,39 +94,4 @@ impl NFA {
         }
         states
     }
-}
-
-fn shift_transitions(
-    mut transitions: Vec<StateTransitions>,
-    amount: usize,
-) -> Vec<StateTransitions> {
-    let shift_state = |s: StateID| StateID::new(s.as_usize() + amount);
-    let shift_transitions = |t| match t {
-        StateTransitions::None => StateTransitions::None,
-        StateTransitions::OneCharacter(c, s) => StateTransitions::OneCharacter(c, shift_state(s)),
-        StateTransitions::OneEpsilon(s) => StateTransitions::OneEpsilon(shift_state(s)),
-        StateTransitions::TwoEpsilon(s, t) => {
-            StateTransitions::TwoEpsilon(shift_state(s), shift_state(t))
-        }
-    };
-
-    transitions
-        .iter_mut()
-        .for_each(|t| *t = shift_transitions(*t));
-    transitions
-}
-
-fn patch_accepting_state(
-    mut transitions: Vec<StateTransitions>,
-    new: StateTransitions,
-) -> Vec<StateTransitions> {
-    *transitions
-        .last_mut()
-        .expect("should have at least two states") = new;
-    transitions
-}
-
-fn alphabet_union(mut first: BTreeSet<char>, mut second: BTreeSet<char>) -> BTreeSet<char> {
-    first.append(&mut second);
-    first
 }

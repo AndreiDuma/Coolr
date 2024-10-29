@@ -6,13 +6,13 @@ mod util;
 fn main() {
     println!("One day I will be a Cool compiler!");
 
-    let expr = regex::Ast::Repetition(Box::new(regex::Ast::Alternation(vec![
+    let ast = regex::Ast::Repetition(Box::new(regex::Ast::Alternation(vec![
         regex::Ast::Concatenation(vec![regex::Ast::Character('a'), regex::Ast::Character('b')]),
         regex::Ast::Character('c'),
     ])));
-    dbg!(&expr);
+    dbg!(&ast);
 
-    let nfa = nfa::build(expr);
+    let nfa = nfa::NFA::new(&ast);
     dbg!(&nfa);
 
     let dfa = dfa::build(&nfa);

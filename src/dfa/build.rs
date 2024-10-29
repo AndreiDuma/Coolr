@@ -5,7 +5,7 @@ use crate::nfa::NFA;
 use crate::util::StateSet;
 
 pub fn build(nfa: &NFA) -> DFA {
-    let initial_config = nfa.follow_epsilon(&StateSet::with_state(nfa.initial_state()));
+    let initial_config = nfa.follow_epsilon(&StateSet::with_state(nfa.start_state()));
 
     let mut configs = BTreeSet::new();
     configs.insert(initial_config.clone()); // TODO: can we not clone here?

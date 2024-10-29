@@ -14,6 +14,8 @@ impl Ast {
     }
 }
 
+/// An iterator that returns references to the sub-expressions of an
+/// `Ast` in postorder.
 pub struct AstIter<'a> {
     stack: Vec<&'a Ast>,
 }

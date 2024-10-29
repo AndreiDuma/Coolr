@@ -1,44 +1,20 @@
-use crate::nfa::NFA;
+use std::collections::BTreeSet;
+
+use crate::nfa::{State, NFA};
 use crate::regex::{self, Ast};
 use crate::util::StateID;
 
-pub fn build(expr: Ast) -> NFA {
-    match expr {
-        Ast::Empty => NFA::empty(),
-        Ast::Character(c) => NFA::character(c),
-        Ast::Concatenation(exprs) => exprs
-            .into_iter()
-            .map(build)
-            .reduce(NFA::concatenation)
-            .expect("a concatenation expression must not be empty"),
-        Ast::Alternation(exprs) => exprs
-            .into_iter()
-            .map(build)
-            .reduce(NFA::union)
-            .expect("an alternation expression must not be empty"),
-        Ast::Repetition(expr) => NFA::kleene_star(build(*expr)),
-    }
-}
-
-////
-
-#[derive(Clone)]
-enum State {
-    Empty(StateID),
-    Union(Vec<StateID>),
-    Character(StateID, char),
-    Match,
-}
-
 #[derive(Clone, Copy)]
-struct StatePair {
+struct StartEndIDs {
     start: StateID,
     end: StateID,
 }
 
 #[derive(Clone, Default)]
-struct Builder {
+pub(super) struct Builder {
     states: Vec<State>,
+    start_states: Vec<StateID>,
+    alphabet: BTreeSet<char>,
 }
 
 impl Builder {
@@ -46,17 +22,12 @@ impl Builder {
         Self::default()
     }
 
-    // pub fn build(ast: &regex::Ast) -> NFA {
-    //     let mut builder = Self::new();
-    //     let sub = builder.add_ast(ast);
-
-    // 	NFA::from_parts(builder.states)
-
-    //     todo!()
-    // }
-
-    fn add_ast(&mut self, ast: &regex::Ast) -> StatePair {
-        ast.iter()
+    pub fn add_ast(&mut self, ast: &regex::Ast) {
+        // Traverse the AST in postorder, joining sub-NFAs into
+        // "composite" NFAs until the root is reached. The start state
+        // of the resulting NFA is recorded.
+        let sub = ast
+            .iter()
             .fold(Vec::new(), |mut stack, ast| {
                 let sub = match ast {
                     Ast::Empty => self.add_empty(),
@@ -73,36 +44,51 @@ impl Builder {
                 stack
             })
             .pop()
-            .unwrap()
+            .unwrap();
+        self.start_states.push(sub.start);
+
+        // Another pass through the AST updates the NFA's alphabet.
+        ast.iter().for_each(|ast| match ast {
+            Ast::Character(chr) => {
+                self.alphabet.insert(*chr);
+            }
+            _ => {}
+        });
     }
 
-    fn add_empty(&mut self) -> StatePair {
+    pub fn build(mut self) -> NFA {
+        let start = self.add_state(State::Alternation(self.start_states.clone()));
+
+        NFA::from_parts(self.states, start, self.alphabet)
+    }
+
+    fn add_empty(&mut self) -> StartEndIDs {
         let end = self.add_state(State::Match);
         let start = self.add_state(State::Empty(end));
-        StatePair { start, end }
+        StartEndIDs { start, end }
     }
 
-    fn add_character(&mut self, chr: char) -> StatePair {
+    fn add_character(&mut self, chr: char) -> StartEndIDs {
         let end = self.add_state(State::Match);
         let start = self.add_state(State::Character(end, chr));
-        StatePair { start, end }
+        StartEndIDs { start, end }
     }
 
-    fn add_concatenation<I>(&mut self, it: I) -> StatePair
+    fn add_concatenation<I>(&mut self, it: I) -> StartEndIDs
     where
-        I: DoubleEndedIterator<Item = StatePair>,
+        I: DoubleEndedIterator<Item = StartEndIDs>,
     {
         let end = self.add_state(State::Match);
         let start = it.rev().fold(end, |next, sub| {
             self.patch(sub.end, State::Empty(next));
             sub.start
         });
-        StatePair { start, end }
+        StartEndIDs { start, end }
     }
 
-    fn add_alternation<I>(&mut self, it: I) -> StatePair
+    fn add_alternation<I>(&mut self, it: I) -> StartEndIDs
     where
-        I: Iterator<Item = StatePair>,
+        I: Iterator<Item = StartEndIDs>,
     {
         let end = self.add_state(State::Match);
         let alternatives = it
@@ -111,15 +97,15 @@ impl Builder {
                 sub.start
             })
             .collect();
-        let start = self.add_state(State::Union(alternatives));
-        StatePair { start, end }
+        let start = self.add_state(State::Alternation(alternatives));
+        StartEndIDs { start, end }
     }
 
-    fn add_repetition(&mut self, sub: StatePair) -> StatePair {
+    fn add_repetition(&mut self, sub: StartEndIDs) -> StartEndIDs {
         let end = self.add_state(State::Match);
-        let start = self.add_state(State::Union(vec![sub.start, end]));
-        self.patch(sub.end, State::Union(vec![sub.start, end]));
-        StatePair { start, end }
+        let start = self.add_state(State::Alternation(vec![sub.start, end]));
+        self.patch(sub.end, State::Alternation(vec![sub.start, end]));
+        StartEndIDs { start, end }
     }
 
     fn add_state(&mut self, state: State) -> StateID {
