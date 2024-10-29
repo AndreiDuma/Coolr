@@ -78,8 +78,13 @@ impl Builder {
     where
         I: DoubleEndedIterator<Item = StartEndIDs>,
     {
-        let end = self.add_state(State::Match);
-        let start = it.rev().fold(end, |next, sub| {
+        let mut it_rev = it.rev();
+        let last = it_rev
+            .next()
+            .expect("concatenations cannot have zero sub-expressions");
+
+        let end = last.end;
+        let start = it_rev.fold(last.start, |next, sub| {
             self.patch(sub.end, State::Empty(next));
             sub.start
         });

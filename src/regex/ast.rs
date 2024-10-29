@@ -1,3 +1,5 @@
+/// TODO: Create smart constructors not allowing invalid ASTs (such as
+/// concatenations of zero sub-expressions).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Ast {
     Empty,
