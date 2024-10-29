@@ -1,5 +1,9 @@
-#[derive(Copy, Clone, Debug)]
-struct State(usize);
+use std::collections::BTreeSet;
+
+/// TODO: move this to a shared module since it's also used in the
+/// DFA.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct State(usize);
 
 #[derive(Copy, Clone, Debug)]
 enum StateTransitions {
@@ -9,8 +13,14 @@ enum StateTransitions {
     TwoEpsilon(State, State),
 }
 
+// pub enum Transition {
+//     Character(char, State),
+//     Epsilon(State),
+// }
+
 #[derive(Clone, Debug)]
 pub struct NFA {
+    alphabet: BTreeSet<char>,
     initial_state: State,
     accepting_state: State,
     transitions: Vec<StateTransitions>,
@@ -19,6 +29,7 @@ pub struct NFA {
 impl NFA {
     pub fn empty() -> Self {
         Self {
+            alphabet: BTreeSet::new(),
             initial_state: State(0),
             accepting_state: State(1),
             transitions: vec![
@@ -30,6 +41,11 @@ impl NFA {
 
     pub fn character(c: char) -> Self {
         Self {
+            alphabet: {
+                let mut alphabet = BTreeSet::new();
+                alphabet.insert(c);
+                alphabet
+            },
             initial_state: State(0),
             accepting_state: State(1),
             transitions: vec![
@@ -52,6 +68,7 @@ impl NFA {
         transitions.extend(shift_transitions(second.transitions, transitions.len()));
 
         Self {
+            alphabet: alphabet_union(first.alphabet, second.alphabet),
             initial_state,
             accepting_state,
             transitions,
@@ -86,6 +103,7 @@ impl NFA {
         transitions.push(StateTransitions::None);
 
         Self {
+            alphabet: alphabet_union(first.alphabet, second.alphabet),
             initial_state,
             accepting_state,
             transitions,
@@ -112,23 +130,54 @@ impl NFA {
         transitions.push(StateTransitions::None);
 
         Self {
+            alphabet: nfa.alphabet,
             initial_state,
             accepting_state,
             transitions,
         }
     }
 
-    pub fn initial_state(&self) -> usize {
-        0
+    pub fn alphabet(&self) -> impl Iterator<Item = char> + '_ {
+        self.alphabet.iter().copied()
     }
 
-    pub fn accepting_state(&self) -> usize {
-        self.transitions.len() - 1
+    pub fn initial_state(&self) -> State {
+        State(0)
+    }
+
+    pub fn accepting_state(&self) -> State {
+        State(self.transitions.len() - 1)
+    }
+
+    pub fn is_accepting_state(&self, state: State) -> bool {
+        state == self.accepting_state()
     }
 
     pub fn size(&self) -> usize {
         self.transitions.len()
     }
+
+    pub fn on_epsilon(&self, state: State) -> Vec<State> {
+        match self.transitions[state.0] {
+            StateTransitions::OneEpsilon(s) => vec![s],
+            StateTransitions::TwoEpsilon(s, t) => vec![s, t],
+            _ => vec![],
+        }
+    }
+
+    pub fn on_character(&self, state: State, chr: char) -> Option<State> {
+        match self.transitions[state.0] {
+            StateTransitions::OneCharacter(c, s) if c == chr => Some(s),
+            _ => None,
+        }
+    }
+
+    // pub fn on_character(&self, state: State) -> Option<(char, State)> {
+    //     match self.transitions[state.0] {
+    //         StateTransitions::OneCharacter(c, s) => Some((c, s)),
+    //         _ => None,
+    //     }
+    // }
 }
 
 fn shift_transitions(
@@ -159,4 +208,9 @@ fn patch_accepting_state(
         .last_mut()
         .expect("should have at least two states") = new;
     transitions
+}
+
+fn alphabet_union(mut first: BTreeSet<char>, mut second: BTreeSet<char>) -> BTreeSet<char> {
+    first.append(&mut second);
+    first
 }

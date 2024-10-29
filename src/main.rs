@@ -1,5 +1,4 @@
-use regex::tokenize;
-
+mod dfa;
 mod regex;
 mod thompson;
 
