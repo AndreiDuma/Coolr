@@ -1,6 +1,6 @@
-use std::collections::{btree_set, BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 
-use crate::thompson::{State, NFA};
+use crate::nfa::{State, NFA};
 
 struct DFA {
     initial_state: State,

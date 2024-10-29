@@ -1,4 +1,4 @@
-use crate::thompson::NFA;
+use crate::nfa::NFA;
 
 // #[derive(Clone, PartialEq, Eq)]
 // struct Alphabet {
