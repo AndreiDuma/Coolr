@@ -10,13 +10,3 @@ pub struct DFA {
 }
 
 impl DFA {}
-
-// impl IntoIterator for Configuration {
-//     type Item = State;
-
-//     type IntoIter = btree_set::IntoIter<State>;
-
-//     fn into_iter(self) -> Self::IntoIter {
-//         self.states.into_iter()
-//     }
-// }

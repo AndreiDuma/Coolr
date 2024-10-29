@@ -3,9 +3,7 @@ use std::collections::BTreeSet;
 use crate::nfa::StateID;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct StateSet {
-    states: BTreeSet<StateID>,
-}
+pub struct StateSet(BTreeSet<StateID>);
 
 impl StateSet {
     pub fn new() -> Self {
@@ -14,19 +12,37 @@ impl StateSet {
 
     pub fn with_state(state: StateID) -> Self {
         let mut config = Self::new();
-        config.states.insert(state);
+        config.0.insert(state);
         config
     }
 
-    pub fn with_states(states: BTreeSet<StateID>) -> StateSet {
-        StateSet { states }
+    pub fn insert(&mut self, state: StateID) -> bool {
+        self.0.insert(state)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.states.is_empty()
+        self.0.is_empty()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = StateID> + '_ {
-        self.states.iter().copied()
+    pub fn contains(&self, state: StateID) -> bool {
+        self.0.contains(&state)
+    }
+
+    pub fn iter(&self) -> StateSetIter<'_> {
+        StateSetIter(self.0.iter())
+    }
+}
+
+/// An iterator over all states in a StatesSet.
+///
+/// The lifetime `'a` refers to the lifetime of the set being iterator
+/// over.
+pub struct StateSetIter<'a>(std::collections::btree_set::Iter<'a, StateID>);
+
+impl<'a> Iterator for StateSetIter<'a> {
+    type Item = StateID;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().copied()
     }
 }
