@@ -13,7 +13,13 @@ pub(super) enum State {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(super) struct PatternID(usize);
+pub struct PatternID(usize);
+
+impl PatternID {
+    pub fn new(id: usize) -> Self {
+        Self(id)
+    }
+}
 
 #[derive(Debug)]
 pub struct NFA {

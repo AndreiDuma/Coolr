@@ -1,4 +1,7 @@
-use lexer::{dfa, nfa, regex};
+use lexer::{
+    nfa::{self, Automaton, PatternID},
+    regex,
+};
 
 mod lexer;
 
@@ -11,12 +14,18 @@ fn main() {
     ])));
     dbg!(&ast);
 
-    let nfa = nfa::NFA::new(&ast);
+    for c in ast.iter() {
+        println!("{c:?}");
+    }
+
+    let nfa = nfa::NFA::new(&ast, PatternID::new(0));
     dbg!(&nfa);
 
-    let dfa = dfa::build(&nfa);
-    dbg!(&dfa);
+    dbg!(nfa.execute("ab"));
 
-    let re = "(ab|c)*";
-    regex::tokenize(re.chars()).for_each(|t| println!("{t:?}"));
+    // let dfa = dfa::build(&nfa);
+    // dbg!(&dfa);
+
+    // let re = "(ab|c)*";
+    // regex::tokenize(re.chars()).for_each(|t| println!("{t:?}"));
 }

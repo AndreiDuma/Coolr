@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::lexer::util::StateID;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
 pub struct StateSet(BTreeSet<StateID>);
 
 impl StateSet {
