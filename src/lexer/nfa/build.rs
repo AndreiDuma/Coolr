@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::nfa::{State, NFA};
-use crate::regex::{self, Ast};
-use crate::util::StateID;
+use crate::lexer::nfa::{PatternID, State, NFA};
+use crate::lexer::regex::{self, Ast};
+use crate::lexer::util::StateID;
 
 #[derive(Clone, Copy)]
 struct StartEndIDs {
@@ -12,6 +12,7 @@ struct StartEndIDs {
 
 #[derive(Clone, Default)]
 pub(super) struct Builder {
+    pattern: PatternID,
     states: Vec<State>,
     start_states: Vec<StateID>,
     alphabet: BTreeSet<char>,
@@ -22,7 +23,11 @@ impl Builder {
         Self::default()
     }
 
-    pub fn add_ast(&mut self, ast: &regex::Ast) {
+    pub fn add_ast(&mut self, ast: &regex::Ast, pattern: PatternID) {
+        // Save the pattern to be used later, when creating empty and
+        // character states.
+        self.pattern = pattern;
+
         // Traverse the AST in postorder, joining sub-NFAs into
         // "composite" NFAs until the root is reached. The start state
         // of the resulting NFA is recorded.
@@ -48,11 +53,10 @@ impl Builder {
         self.start_states.push(sub.start);
 
         // Another pass through the AST updates the NFA's alphabet.
-        ast.iter().for_each(|ast| match ast {
-            Ast::Character(chr) => {
+        ast.iter().for_each(|ast| {
+            if let Ast::Character(chr) = ast {
                 self.alphabet.insert(*chr);
             }
-            _ => {}
         });
     }
 
@@ -63,13 +67,13 @@ impl Builder {
     }
 
     fn add_empty(&mut self) -> StartEndIDs {
-        let end = self.add_state(State::Match);
+        let end = self.add_match_state();
         let start = self.add_state(State::Empty(end));
         StartEndIDs { start, end }
     }
 
     fn add_character(&mut self, chr: char) -> StartEndIDs {
-        let end = self.add_state(State::Match);
+        let end = self.add_match_state();
         let start = self.add_state(State::Character(end, chr));
         StartEndIDs { start, end }
     }
@@ -95,7 +99,7 @@ impl Builder {
     where
         I: Iterator<Item = StartEndIDs>,
     {
-        let end = self.add_state(State::Match);
+        let end = self.add_match_state();
         let alternatives = it
             .map(|sub| {
                 self.patch(sub.end, State::Empty(end));
@@ -107,10 +111,14 @@ impl Builder {
     }
 
     fn add_repetition(&mut self, sub: StartEndIDs) -> StartEndIDs {
-        let end = self.add_state(State::Match);
+        let end = self.add_match_state();
         let start = self.add_state(State::Alternation(vec![sub.start, end]));
         self.patch(sub.end, State::Alternation(vec![sub.start, end]));
         StartEndIDs { start, end }
+    }
+
+    fn add_match_state(&mut self) -> StateID {
+        self.add_state(State::Match(self.pattern))
     }
 
     fn add_state(&mut self, state: State) -> StateID {

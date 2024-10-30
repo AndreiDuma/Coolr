@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::util::StateID;
+use crate::lexer::util::StateID;
 
 #[derive(Debug)]
 pub struct DFA {
