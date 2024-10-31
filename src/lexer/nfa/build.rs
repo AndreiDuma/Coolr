@@ -4,7 +4,7 @@ use crate::lexer::nfa::{PatternID, State, NFA};
 use crate::lexer::regex::{self, Ast};
 use crate::lexer::util::StateID;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct StartEndIDs {
     start: StateID,
     end: StateID,
@@ -31,21 +31,26 @@ impl Builder {
         // Traverse the AST in postorder, joining sub-NFAs into
         // "composite" NFAs until the root is reached. The start state
         // of the resulting NFA is recorded.
-        let sub = ast
-            .iter()
+        let preorder: Vec<_> = ast.iter().collect();
+        let sub = preorder
+            .into_iter()
+            .rev() // Postorder.
             .fold(Vec::new(), |mut stack, ast| {
                 let sub = match ast {
                     Ast::Empty => self.add_empty(),
                     Ast::Character(chr) => self.add_character(*chr),
-                    Ast::Concatenation(children) => {
-                        self.add_concatenation(stack.iter().rev().copied().take(children.len()))
+                    Ast::Concatenation(asts) => {
+                        let subs = stack.split_off(stack.len() - asts.len());
+                        self.add_concatenation(subs)
                     }
-                    Ast::Alternation(children) => {
-                        self.add_alternation(stack.iter().rev().copied().take(children.len()))
+                    Ast::Alternation(asts) => {
+                        let subs = stack.split_off(stack.len() - asts.len());
+                        self.add_alternation(subs)
                     }
                     Ast::Repetition(_) => self.add_repetition(stack.pop().unwrap()),
                 };
                 stack.push(sub);
+                dbg!("{ast:?} {sub:?} {stack:?}");
                 stack
             })
             .pop()
@@ -78,11 +83,8 @@ impl Builder {
         StartEndIDs { start, end }
     }
 
-    fn add_concatenation<I>(&mut self, it: I) -> StartEndIDs
-    where
-        I: DoubleEndedIterator<Item = StartEndIDs>,
-    {
-        let mut it_rev = it.rev();
+    fn add_concatenation(&mut self, subs: Vec<StartEndIDs>) -> StartEndIDs {
+        let mut it_rev = subs.into_iter().rev();
         let last = it_rev
             .next()
             .expect("concatenations cannot have zero sub-expressions");
@@ -95,12 +97,10 @@ impl Builder {
         StartEndIDs { start, end }
     }
 
-    fn add_alternation<I>(&mut self, it: I) -> StartEndIDs
-    where
-        I: Iterator<Item = StartEndIDs>,
-    {
+    fn add_alternation(&mut self, subs: Vec<StartEndIDs>) -> StartEndIDs {
         let end = self.add_match_state();
-        let alternatives = it
+        let alternatives = subs
+            .into_iter()
             .map(|sub| {
                 self.patch(sub.end, State::Empty(end));
                 sub.start

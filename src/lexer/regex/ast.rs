@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 
-/// TODO: Create smart constructors not allowing invalid ASTs (such as
-/// concatenations of zero sub-expressions).
+type Result<T> = core::result::Result<T, Box<dyn core::error::Error>>;
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Ast {
     Empty,
@@ -13,6 +13,36 @@ pub enum Ast {
 }
 
 impl Ast {
+    pub fn new(_pattern: &str) -> Result<Self> {
+        todo!()
+    }
+
+    pub fn empty() -> Result<Self> {
+        Ok(Self::Empty)
+    }
+
+    pub fn character(chr: char) -> Result<Self> {
+        Ok(Self::Character(chr))
+    }
+
+    pub fn concatenation(asts: &[Ast]) -> Result<Self> {
+        if asts.len() == 0 {
+            Err("cannot have a concatenation of zero elements")?;
+        }
+        Ok(Self::Concatenation(asts.to_vec()))
+    }
+
+    pub fn alternation(asts: &[Ast]) -> Result<Self> {
+        if asts.len() == 0 {
+            Err("cannot have an alternation of zero elements")?;
+        }
+        Ok(Self::Alternation(asts.to_vec()))
+    }
+
+    pub fn repetition(ast: &Ast) -> Result<Self> {
+        Ok(Self::Repetition(Box::new(ast.clone())))
+    }
+
     pub fn iter(&self) -> AstIter<'_> {
         AstIter { stack: vec![self] }
     }

@@ -1,6 +1,7 @@
+use std::fmt::Debug;
 use std::ops::{Index, IndexMut};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StateID(usize);
 
 impl StateID {
@@ -10,6 +11,12 @@ impl StateID {
 
     pub fn as_usize(&self) -> usize {
         self.0
+    }
+}
+
+impl Debug for StateID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

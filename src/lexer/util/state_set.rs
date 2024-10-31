@@ -1,8 +1,9 @@
+use core::fmt::Debug;
 use std::collections::BTreeSet;
 
 use crate::lexer::util::StateID;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct StateSet(BTreeSet<StateID>);
 
 impl StateSet {
@@ -30,6 +31,12 @@ impl StateSet {
 
     pub fn iter(&self) -> StateSetIter<'_> {
         StateSetIter(self.0.iter())
+    }
+}
+
+impl Debug for StateSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

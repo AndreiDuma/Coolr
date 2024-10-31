@@ -1,31 +1,42 @@
-use lexer::{
-    nfa::{self, Automaton, PatternID},
-    regex,
-};
+#![allow(dead_code)] // TODO: remove this... when possible.
 
 mod lexer;
 
-fn main() {
+use lexer::nfa::{self, Automaton, PatternID};
+use lexer::regex;
+
+fn main() -> Result<(), Box<dyn core::error::Error>> {
     println!("One day I will be a Cool compiler!");
 
-    let ast = regex::Ast::Repetition(Box::new(regex::Ast::Alternation(vec![
-        regex::Ast::Concatenation(vec![regex::Ast::Character('a'), regex::Ast::Character('b')]),
-        regex::Ast::Character('c'),
-    ])));
-    dbg!(&ast);
+    // Build a regex AST by hand. In the future, there will be a
+    // parser to build ASTs from strings.
+    let ast = {
+        use regex::Ast;
 
-    for c in ast.iter() {
-        println!("{c:?}");
+        Ast::repetition(&Ast::alternation(&[
+            Ast::concatenation(&[Ast::character('a')?, Ast::character('b')?])?,
+            Ast::character('c')?,
+        ])?)?
+    };
+    println!("AST: {:?}", &ast);
+
+    // Traverse AST.
+    println!("Traversal:");
+    for a in ast.iter() {
+        println!("- {a:?}");
     }
 
+    // Build an NFA from the AST using Thompson's construction.
     let nfa = nfa::NFA::new(&ast, PatternID::new(0));
-    dbg!(&nfa);
+    println!("NFA: {:?}", &nfa);
 
-    dbg!(nfa.execute("ab"));
+    // Execute the NFA on an input string.
+    let input = "abcab";
+    println!("Execute NFA on {input:?}: {:?}", nfa.execute(input));
 
+    // Build DFA from NFA using the powerset construction.
     // let dfa = dfa::build(&nfa);
     // dbg!(&dfa);
 
-    // let re = "(ab|c)*";
-    // regex::tokenize(re.chars()).for_each(|t| println!("{t:?}"));
+    Ok(())
 }
