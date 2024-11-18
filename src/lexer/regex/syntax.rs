@@ -11,88 +11,13 @@
 //
 // Terminals: eoi, character, '|', '*', '(', ')'
 
-use std::{error::Error, iter::Peekable};
-
+use crate::regex::lexer::{Token, Tokens};
 use crate::regex::Ast;
+use crate::regex::Result;
 
-type Result<T> = core::result::Result<T, Box<dyn Error>>;
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Token {
-    Character(char),
-    Alternation,
-    KleeneStar,
-    LeftParen,
-    RightParen,
-    EndOfInput,
-}
-
-pub fn tokens(chars: impl Iterator<Item = char>) -> Peekable<impl Iterator<Item = Token>> {
-    chars
-        .map(|c| match c {
-            '|' => Token::Alternation,
-            '*' => Token::KleeneStar,
-            '(' => Token::LeftParen,
-            ')' => Token::RightParen,
-            c => Token::Character(c),
-        })
-        .chain(std::iter::once(Token::EndOfInput))
-        .peekable()
-}
-
-///
-
-struct Tokens<'a> {
-    inner: Peekable<Box<dyn Iterator<Item = Token> + 'a>>,
-}
-
-impl<'a> Tokens<'a> {
-    fn new(chars: impl Iterator<Item = char> + 'a) -> Self {
-        let inner = chars
-            .map(|c| match c {
-                '|' => Token::Alternation,
-                '*' => Token::KleeneStar,
-                '(' => Token::LeftParen,
-                ')' => Token::RightParen,
-                c => Token::Character(c),
-            })
-            .chain(std::iter::once(Token::EndOfInput));
-        let inner = Box::new(inner) as Box<dyn Iterator<Item = Token>>;
-        let inner = inner.peekable();
-        Self { inner }
-    }
-}
-
-impl Iterator for Tokens<'_> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
+use super::lexer::{Tokens2, Tokens3};
 
 ////
-
-pub struct Lexer {
-    // tokens: Box<dyn Iterator<Item = Token> + 'a>,
-}
-
-impl Lexer {
-    pub fn tokens(chars: impl Iterator<Item = char>) -> Peekable<impl Iterator<Item = Token>> {
-        chars
-            .map(|c| match c {
-                '|' => Token::Alternation,
-                '*' => Token::KleeneStar,
-                '(' => Token::LeftParen,
-                ')' => Token::RightParen,
-                c => Token::Character(c),
-            })
-            .chain(std::iter::once(Token::EndOfInput))
-            .peekable()
-    }
-}
-
-///
 
 fn fail(msg: &str) -> Result<Ast> {
     Err(msg)?
@@ -101,12 +26,12 @@ fn fail(msg: &str) -> Result<Ast> {
 pub fn parse(re: &str) -> Result<Ast> {
     // let mut tokens = tokens(re.chars()).peekable();
 
-    let mut tokens = Tokens::new(re.chars());
+    let mut tokens = Tokens2::new(re.chars());
 
     alternation(&mut tokens)
 }
 
-fn alternation(tokens: &mut Tokens) -> Result<Ast> {
+fn alternation(tokens: &mut Tokens2) -> Result<Ast> {
     let mut alts = vec![concatenation(tokens)?];
     while let Some(token) = tokens.next() {
         match token {
@@ -120,7 +45,7 @@ fn alternation(tokens: &mut Tokens) -> Result<Ast> {
     Ok(Ast::Alternation(alts))
 }
 
-fn concatenation(tokens: &mut Tokens) -> Result<Ast> {
+fn concatenation(tokens: &mut Tokens2) -> Result<Ast> {
     let mut parts = vec![repetition(tokens)?];
     while let Some(token) = tokens.next() {
         match token {
@@ -134,7 +59,7 @@ fn concatenation(tokens: &mut Tokens) -> Result<Ast> {
     Ok(Ast::Concatenation(parts))
 }
 
-fn repetition(tokens: &mut Tokens) -> Result<Ast> {
+fn repetition(tokens: &mut Tokens2) -> Result<Ast> {
     let mut rep = parentheses(tokens)?;
     while let Some(token) = tokens.next() {
         match token {
@@ -148,6 +73,6 @@ fn repetition(tokens: &mut Tokens) -> Result<Ast> {
     Ok(rep)
 }
 
-fn parentheses(_tokens: &mut Tokens) -> Result<Ast> {
+fn parentheses(_tokens: &mut Tokens2) -> Result<Ast> {
     fail("bla")
 }
