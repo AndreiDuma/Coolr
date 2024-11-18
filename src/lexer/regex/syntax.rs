@@ -27,61 +27,59 @@ pub enum Token {
     EndOfInput,
 }
 
-pub fn tokenize(iter: impl Iterator<Item = char>) -> impl Iterator<Item = Token> {
-    iter.map(|c| match c {
-        '|' => Token::Alternation,
-        '*' => Token::KleeneStar,
-        '(' => Token::LeftParen,
-        ')' => Token::RightParen,
-        c => Token::Character(c),
-    })
-    .chain(std::iter::once(Token::EndOfInput))
-    .peekable()
+pub fn tokens(chars: impl Iterator<Item = char>) -> Peekable<impl Iterator<Item = Token>> {
+    chars
+        .map(|c| match c {
+            '|' => Token::Alternation,
+            '*' => Token::KleeneStar,
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            c => Token::Character(c),
+        })
+        .chain(std::iter::once(Token::EndOfInput))
+        .peekable()
 }
-
-// struct LexerGeneric<I>
-// where
-//     I: Iterator<Item = Token>,
-// {
-//     tokens: Peekable<I>,
-// }
-
-// impl<I> LexerGeneric<I>
-// where
-//     I: Iterator<Item = Token>,
-// {
-//     fn new(chars: impl Iterator<Item = char>) -> Self {
-//         let tokens = chars
-//             .map(|c| match c {
-//                 '|' => Token::Alternation,
-//                 '*' => Token::KleeneStar,
-//                 '(' => Token::LeftParen,
-//                 ')' => Token::RightParen,
-//                 c => Token::Character(c),
-//             })
-//             .chain(std::iter::once(Token::EndOfInput))
-//             .peekable();
-//         Self { tokens }
-//     }
-
-//     fn next(&mut self) -> Option<Token> {
-//         self.tokens.next()
-//     }
-
-//     fn peek(&mut self) -> Option<&Token> {
-//         self.tokens.peek()
-//     }
-// }
 
 ///
 
-struct Lexer<'a> {
-    tokens: Box<dyn Iterator<Item = Token> + 'a>,
+struct Tokens<'a> {
+    inner: Peekable<Box<dyn Iterator<Item = Token> + 'a>>,
 }
 
-impl<'a> Lexer<'a> {
+impl<'a> Tokens<'a> {
     fn new(chars: impl Iterator<Item = char> + 'a) -> Self {
-        let tokens = chars
+        let inner = chars
+            .map(|c| match c {
+                '|' => Token::Alternation,
+                '*' => Token::KleeneStar,
+                '(' => Token::LeftParen,
+                ')' => Token::RightParen,
+                c => Token::Character(c),
+            })
+            .chain(std::iter::once(Token::EndOfInput));
+        let inner = Box::new(inner) as Box<dyn Iterator<Item = Token>>;
+        let inner = inner.peekable();
+        Self { inner }
+    }
+}
+
+impl Iterator for Tokens<'_> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+////
+
+pub struct Lexer {
+    // tokens: Box<dyn Iterator<Item = Token> + 'a>,
+}
+
+impl Lexer {
+    pub fn tokens(chars: impl Iterator<Item = char>) -> Peekable<impl Iterator<Item = Token>> {
+        chars
             .map(|c| match c {
                 '|' => Token::Alternation,
                 '*' => Token::KleeneStar,
@@ -90,31 +88,30 @@ impl<'a> Lexer<'a> {
                 c => Token::Character(c),
             })
             .chain(std::iter::once(Token::EndOfInput))
-            .peekable();
-        Self {
-            tokens: Box::new(tokens),
-        }
+            .peekable()
     }
-
-    fn next(&mut self) -> Option<Token> {
-        self.tokens.next()
-    }
-
-    // fn peek(&self) -> Option<Token> {
-    //     self.tokens.peek()
-    // }
 }
 
-fn parse(lexer: &mut Lexer) -> Result<Ast> {
-    alternation(lexer)
+///
+
+fn fail(msg: &str) -> Result<Ast> {
+    Err(msg)?
 }
 
-fn alternation(lexer: &mut Lexer) -> Result<Ast> {
-    let mut alts = vec![concatenation(lexer)?];
-    while let Some(token) = lexer.next() {
+pub fn parse(re: &str) -> Result<Ast> {
+    // let mut tokens = tokens(re.chars()).peekable();
+
+    let mut tokens = Tokens::new(re.chars());
+
+    alternation(&mut tokens)
+}
+
+fn alternation(tokens: &mut Tokens) -> Result<Ast> {
+    let mut alts = vec![concatenation(tokens)?];
+    while let Some(token) = tokens.next() {
         match token {
             Token::Alternation => {
-                alts.push(concatenation(lexer)?);
+                alts.push(concatenation(tokens)?);
             }
             Token::EndOfInput | Token::RightParen => break,
             _ => Err("expected '|', ')', or end of input")?,
@@ -123,12 +120,12 @@ fn alternation(lexer: &mut Lexer) -> Result<Ast> {
     Ok(Ast::Alternation(alts))
 }
 
-fn concatenation(lexer: &mut Lexer) -> Result<Ast> {
-    let mut parts = vec![repetition(lexer)?];
-    while let Some(token) = lexer.next() {
+fn concatenation(tokens: &mut Tokens) -> Result<Ast> {
+    let mut parts = vec![repetition(tokens)?];
+    while let Some(token) = tokens.next() {
         match token {
             Token::LeftParen | Token::Character(_) => {
-                parts.push(repetition(lexer)?);
+                parts.push(repetition(tokens)?);
             }
             Token::EndOfInput | Token::Alternation | Token::RightParen => break,
             _ => Err("expected character, '|', '(', ')' or end of input")?,
@@ -137,9 +134,9 @@ fn concatenation(lexer: &mut Lexer) -> Result<Ast> {
     Ok(Ast::Concatenation(parts))
 }
 
-fn repetition(lexer: &mut Lexer) -> Result<Ast> {
-    let mut rep = parentheses(lexer)?;
-    while let Some(token) = lexer.next() {
+fn repetition(tokens: &mut Tokens) -> Result<Ast> {
+    let mut rep = parentheses(tokens)?;
+    while let Some(token) = tokens.next() {
         match token {
             Token::KleeneStar => {
                 rep = Ast::Repetition(Box::new(rep));
@@ -151,6 +148,6 @@ fn repetition(lexer: &mut Lexer) -> Result<Ast> {
     Ok(rep)
 }
 
-fn parentheses(lexer: &mut Lexer) -> Result<Ast> {
-    todo!()
+fn parentheses(_tokens: &mut Tokens) -> Result<Ast> {
+    fail("bla")
 }

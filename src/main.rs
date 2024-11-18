@@ -3,10 +3,14 @@
 mod lexer;
 
 use lexer::nfa::{self, Automaton, PatternID};
-use lexer::regex;
+use lexer::regex::{self};
 
 fn main() -> Result<(), Box<dyn core::error::Error>> {
     println!("One day I will be a Cool compiler!");
+
+    let re = "a|b";
+    let ast = regex::parse(re);
+    println!("{ast:?}");
 
     // Build a regex AST by hand. In the future, there will be a
     // parser to build ASTs from strings.
